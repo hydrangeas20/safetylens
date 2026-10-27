@@ -80,3 +80,24 @@ jobs:
           if grep -rn 'secrets\.' .github/workflows; then
             echo "workflows must not use secrets"; exit 1
           fi
+
+  docs:
+    name: README and diagram validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Parse every Mermaid block in README.md with the Mermaid CLI
+        run: |
+          echo '{"args": ["--no-sandbox"]}' > "$RUNNER_TEMP/puppeteer.json"
+          awk -v dir="$RUNNER_TEMP" '/^```mermaid/{n++; f=1; next} /^```/{f=0} f{print > (dir "/readme-" n ".mmd")}' README.md
+          ls "$RUNNER_TEMP"/readme-*.mmd
+          for f in "$RUNNER_TEMP"/readme-*.mmd; do
+            npx -y @mermaid-js/mermaid-cli@11.16.0 -p "$RUNNER_TEMP/puppeteer.json" -i "$f" -o "${f%.mmd}.svg"
+          done
+      - name: Banner and diagram assets exist
+        run: |
+          test -s assets/safetylens-hero.png
+          test -s docs/diagrams/architecture.png

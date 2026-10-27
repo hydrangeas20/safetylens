@@ -68,3 +68,29 @@ visibility change, no change to `safetylens-research`.
   Job logs could not be downloaded from this workspace (blob storage not on the network
   allowlist), so test counts above are from the identical local command.
 - `safetylens-research` remains at `b5d0dba` (checked with `git ls-remote`).
+
+## 2026-10-27: README repair and visual presentation (PR #1 hardening)
+
+### Root cause of "Unable to display rich text"
+- GitHub's server-side Markdown rendering was fine (tables, alert, images and badge all
+  present in the API-rendered HTML). The failure was the client-side Mermaid render.
+- The architecture node `H[(Archive<br/>safetylens-research@b5d0dba)]` contains `@`. Mermaid 11
+  tokenises `name@` as an edge ID (`LINK_ID`, the `e1@-->` syntax), so the whole diagram fails
+  to parse. Mermaid CLI 11.16.0: `Parse error on line 17 ... got 'LINK_ID'`.
+- Minimal reproduction: `A[x@y] --> B` fails. The full original diagram renders once only the
+  `@` is removed; `<br/>`, `&` edges, `×` and subgraphs were not the cause.
+
+### Changes
+- Diagram rewritten with quoted labels and no `@`, `<br/>` or `&` edges. Source of truth is
+  `docs/diagrams/architecture.mmd`, embedded verbatim in the README. Static fallback rendered to
+  `docs/diagrams/architecture.png` with the Mermaid CLI. (An SVG export was rejected because its
+  labels use `foreignObject`, which some viewers drop when the SVG is embedded as an image.)
+- Approved banner committed unmodified as `assets/safetylens-hero.png` (SHA-256 identical to the
+  supplied file). Placeholder SVG removed.
+- README restructured: banner, positioning sentence, badges, research question, factors,
+  methodology, architecture, implementation/verification status, historical audit (separate
+  from validated results), reproducibility, data safety, limitations and next steps.
+- New `tests/unit/test_docs.py`: local links and images resolve in all docs, README diagram
+  equals the source file, fragile Mermaid syntax guarded, labels quoted, banner present.
+- New CI job `docs` parses every README Mermaid block with `@mermaid-js/mermaid-cli@11.16.0`.
+  Checked locally: the old README block exits 1 and the new one exits 0.
