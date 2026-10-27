@@ -150,3 +150,26 @@ def test_corrupt_store_line_raises(tmp_path: Path) -> None:
 def test_store_type_check(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         store(tmp_path).append(OK)  # type: ignore[arg-type]
+
+
+def _call_order(tmp_path: Path, name: str, **sampling: object) -> list[tuple[str, str]]:
+    st = JsonlStore(tmp_path / f"{name}.jsonl", ResponseRecord)
+    cfg = config(design="full", **sampling)
+    collect(cfg, synthetic_items(3, 1), {"m": Scripted([OK])}, st, run_id="r", clock=lambda: "t")
+    return [(r.item_id, r.condition) for r in st.all()]
+
+
+def test_call_order_is_randomized_reproducibly_and_complete(tmp_path: Path) -> None:
+    nested = _call_order(tmp_path, "nested", randomize_order=False)
+    shuffled = _call_order(tmp_path, "a")
+    assert shuffled == _call_order(tmp_path, "b")  # same seed -> same order
+    assert shuffled != nested  # order is not the nested item x condition order
+    assert sorted(shuffled) == sorted(nested)  # same cells, each exactly once
+    assert len(set(shuffled)) == 4 * N_FULL
+    assert _call_order(tmp_path, "c", seed=1) != shuffled  # seed changes the order
+
+
+def test_nested_order_when_randomization_disabled(tmp_path: Path) -> None:
+    order = _call_order(tmp_path, "n", randomize_order=False)
+    items = [i for i, _ in order]
+    assert items == sorted(items, key=items.index)  # items appear in contiguous blocks

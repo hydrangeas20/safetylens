@@ -157,3 +157,22 @@ visibility change, no change to `safetylens-research`.
   `scan.py`; tests build fake values at runtime; the one pushed test blob is pinned as a
   reviewed false positive by exact blob SHA. Release audits are now run after committing, and
   documentation describes detected patterns without quoting them.
+
+## 2026-10-27: focused sprint after PR #1 merged (branch `release/v1-public-audit`)
+
+- PR #1 was squash-merged, so `main` (`f32f80d`) no longer shares commits with PR #2. Its tree
+  is byte-identical to PR #1's head, so PR #2's three commits were cherry-picked onto `main`
+  unchanged; the resulting tree equals PR #2's head.
+- **Audit:** fresh mirror with all `refs/pull/*`; `release-audit --archive` gives 0 blocking
+  findings over 12 commits and 140 blobs. Actions: 9 runs, 0 artifacts, no secrets or caches.
+  Logs can't be downloaded here, so every CI job's commands were rerun locally and the full
+  output was scanned. `docs/PUBLIC_RELEASE_AUDIT.md` rewritten as a concise current report:
+  PASS.
+- **Protocol:** evaluation-framing effects vs evaluation awareness (§1.1, with a planned
+  manipulation check), experimental units, randomization, pre-specified exclusions, and a full
+  human judge-validation plan. The κ precision claim was checked numerically and corrected:
+  200 responses give about ±0.09, not ±0.07. New open decisions DEC-14 to DEC-16.
+- **Randomization implemented:** `runner.collect` now shuffles the full cell plan with a seeded
+  RNG (`sampling.randomize_order`, default on). Tests check that it is reproducible, complete,
+  seed-dependent, and off when disabled. The committed demo example is unchanged, because fake
+  outputs depend on the cell, not the call order.

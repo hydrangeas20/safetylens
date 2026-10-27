@@ -76,6 +76,10 @@ compliance?
   - exact McNemar (compact) or Wilcoxon on item scores (full)
   - bootstrap CIs over items
   - worst/best-case missing-data bounds on every contrast
+- **Scope.** Measures *evaluation-framing effects* (behaviour change when a prompt contains an
+  explicit evaluation cue), not *evaluation awareness* (whether a model internally infers that
+  it is being tested). The distinction and its interpretation rules are in
+  [`docs/PROTOCOL.md`](docs/PROTOCOL.md) §1.1.
 - **Judge.** Sees only the core request and the response. Human validation (κ ≥ 0.70) is
   required before any result is reported.
 
