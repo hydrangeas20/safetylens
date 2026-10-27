@@ -20,6 +20,13 @@ DOCS = sorted(
 LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)\s]+)\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)|<img[^>]+src=\"([^\"]+)\"")
 MERMAID = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
+FENCED = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
+INLINE_CODE = re.compile(r"`[^`\n]+`")
+
+
+def _strip_code(text: str) -> str:
+    """Links quoted inside code are examples, not references."""
+    return INLINE_CODE.sub("", FENCED.sub("", text))
 
 
 def _local_targets(text: str, pattern: re.Pattern[str]) -> list[str]:
@@ -34,7 +41,7 @@ def _local_targets(text: str, pattern: re.Pattern[str]) -> list[str]:
 
 @pytest.mark.parametrize("doc", DOCS, ids=lambda p: p.relative_to(ROOT).as_posix())
 def test_local_links_and_images_resolve(doc: Path) -> None:
-    text = doc.read_text(encoding="utf-8")
+    text = _strip_code(doc.read_text(encoding="utf-8"))
     missing = [
         t
         for t in _local_targets(text, LINK) + _local_targets(text, IMAGE)
@@ -87,3 +94,13 @@ def test_fragile_syntax_guard_catches_original_failure() -> None:
     original_label = "H[(Archive<br/>safetylens-research@b5d0dba)]"
     assert re.search(r"\w@", original_label)
     assert re.search(r"<br\s*/?>", original_label)
+
+
+def test_link_checker_ignores_code_but_catches_real_links(tmp_path: Path) -> None:
+    text = (
+        'Quoted `<img src="nope.png">` and\n```text\n[x](missing.md)\n```\n'
+        "Real [broken](gone.md) and ![img](absent.png)"
+    )
+    stripped = _strip_code(text)
+    targets = _local_targets(stripped, LINK) + _local_targets(stripped, IMAGE)
+    assert targets == ["gone.md", "absent.png"]

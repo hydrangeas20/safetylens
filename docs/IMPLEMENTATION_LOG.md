@@ -111,3 +111,7 @@ visibility change, no change to `safetylens-research`.
 - **Unverified:** visual inspection of the live GitHub page itself (no signed-in browser for
   the private repository). GitHub's Mermaid viewer version is not published; compatibility is
   inferred from Mermaid 11.16 parsing plus conservative syntax.
+- CI run 40529077472 on `dcc9e4e` failed in `Tests and coverage`: the new link checker treated
+  an `<img src=...>` quoted inside inline code in this log as a real image. The log-only commit
+  had been pushed without rerunning the suite locally. Fix: the checker now ignores inline code
+  and fenced blocks, and a new test confirms it still catches real broken links and images.
