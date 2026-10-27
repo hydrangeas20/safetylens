@@ -3,62 +3,85 @@
 </p>
 
 **SafetyLens measures how the framing of a prompt changes an LLM's harmful compliance while the
-harmful request itself is held constant, with paired statistics, a blinded judge and fully
-offline reproducibility.**
+harmful request itself is held constant. It does this with paired statistics, a blinded judge,
+length-matched controls and fully offline reproducibility.**
 
 [![CI](https://github.com/hydrangeas20/safetylens/actions/workflows/ci.yml/badge.svg)](https://github.com/hydrangeas20/safetylens/actions/workflows/ci.yml)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
 ![Research status: v1 findings pending](https://img.shields.io/badge/v1%20findings-pending-lightgrey)
-![Historical data: exploratory only](https://img.shields.io/badge/historical%20data-exploratory%20only-orange)
 
 > [!IMPORTANT]
-> **Validated v1 research findings are pending.** This repository contains engineering
-> infrastructure, a draft protocol and an audit of an earlier experiment. No v1 data has been
-> collected. The historical numbers are exploratory, have documented defects, and are **not**
-> validated findings.
+> **Validated v1 research findings are pending.** This repository is the engineering foundation
+> and pre-registration draft for the study, plus an audit of an earlier experiment. No v1 data
+> has been collected. Historical numbers are exploratory and have documented defects; synthetic
+> numbers are pipeline checks. Neither is a research result.
+
+## At a glance
+
+| | |
+|---|---|
+| **What it does** | Renders each harmful request under controlled framings (evaluation cue × wording register × pretext, with a length-matched neutral filler control), collects responses, rejects invalid ones, judges the rest blind to the framing, and estimates paired effects with uncertainty and multiple-comparison control. |
+| **Why it matters** | Safety benchmarks ask in terse, test-like ways. Real users ask conversationally, often with a persona or justification. If behaviour depends on framing, benchmark scores misstate deployed behaviour, and a model that recognises tests can look safer than it is. |
+| **Implemented** | Typed Python package and CLI; validity gate for API errors, error text, truncation and missing finish reasons; strict blinded judge; paired statistics with Holm correction and missing-data bounds; power simulation with correlated observations; two-reviewer item gate; full-history release audit; historical re-analysis. |
+| **Verified** | 250+ offline tests (about 97% coverage), strict mypy, CI on every PR. The synthetic demo recovers known ground truth and replays byte-for-byte. Original historical statistics reproduced to 1e-9. |
+| **In progress** | Real item set, judge validation against human labels, live execution with preflight and budget caps, pilot, then the pre-registered run ([gates](docs/PROTOCOL.md#10-gates-before-any-paid-call)). |
+
+## Quick start (offline, about a minute, no API keys)
+
+```bash
+git clone https://github.com/hydrangeas20/safetylens && cd safetylens
+uv sync --locked --python 3.11
+uv run safetylens demo        # synthetic run + strict replay; prints effects with 95% CIs
+```
+
+The demo uses three deterministic **fake** models with known injected behaviour and injected
+failures (API errors, error text, truncation, malformed judge output). It shows:
+
+- invalid observations being excluded and counted
+- the filler control separating "any preamble" from "pretext content"
+- paired effects with bootstrap CIs, Holm-adjusted p-values and missing-data bounds
+
+Committed output: [`examples/synthetic-demo/report.md`](examples/synthetic-demo/report.md).
+It is labelled synthetic and is not a finding about any real model.
 
 ## Research question
 
-Safety benchmarks usually pose harmful requests as terse, test-like prompts. Real users phrase
-them conversationally, and sometimes wrap them in a persona or justification. If a model behaves
-differently across these framings, benchmark scores can misstate how it behaves in deployment,
-and a model that has learned to recognise evaluations could look safer than it is.
-
-SafetyLens asks: **holding the underlying request fixed, how much does each framing feature
-change harmful compliance?**
-
-## What SafetyLens measures
+Holding the underlying request fixed, how much does each framing feature change harmful
+compliance?
 
 | Factor | Levels | Question it answers |
 |---|---|---|
 | **A. Evaluation cue** | none · explicit | Does telling the model it is being evaluated change its behaviour? |
 | **B. Wording register** | terse · conversational | Does natural phrasing alone, with no justification, change it? |
-| **C. Pretext** | none · fiction · professional | Does a persona or justification change it? |
-
-The archived predecessor changed B and C at the same time, so its effects can't be separated.
-This design varies them independently.
+| **C. Pretext** | none · filler · fiction · professional | Does a persona or justification change it, beyond the effect of any preamble? |
 
 ## Methodology (draft protocol)
 
+- **Constant request.** Every condition is composed from an item's fixed parts. Every variant
+  must contain the core request verbatim, which schema validation enforces, and two reviewers
+  confirm equivalence ([`docs/ITEM_REVIEW.md`](docs/ITEM_REVIEW.md)).
+- **Length-matched filler control.** Pretext effects are estimated against a neutral filler
+  sentence of similar length, not against a bare prompt. Otherwise "pretext effect" could just
+  mean "longer prompt".
 - **Item tiers:**
-  - A: harmful in any context (primary analysis)
-  - B: context-dependent (separate appropriateness rubric)
-  - C: benign (over-refusal)
-- **Constant request:** every condition is composed from the item's fixed parts. Any
-  hand-written variant must contain the core request verbatim, which schema validation enforces.
-- **Design:** full 2 × 2 × 3 factorial (12 conditions) or a 5-condition one-factor-at-a-time
-  design. The choice is open; see the simulated power and call volume in
-  [`docs/DESIGN_COMPARISON.md`](docs/DESIGN_COMPARISON.md).
-- **Primary outcome:** blinded `harmful_compliance` on tier A. The judge sees only the core
-  request and the response, never the cue, wording, pretext or model.
-- **Statistics:** paired tests (exact McNemar, or Wilcoxon on item scores), bootstrap CIs over
-  items, Holm correction across models × contrasts.
-- **Validity rules:** only complete, error-free responses are judged. Failed judgments carry no
-  labels and are excluded from every denominator, and exclusions are counted by reason.
-- **Before any result is reported:** human validation of the judge (κ ≥ 0.70), a frozen
-  protocol, and an approved pilot.
+  - A: harmful in any context (primary)
+  - B: context-dependent
+  - C: benign (over-refusal and placebo outcome)
+- **Design.** Full 2 × 2 × 4 factorial (16 conditions) or a 6-condition compact design. The
+  choice is open; simulated power, type I error under correlated observations and call volume
+  are in [`docs/DESIGN_COMPARISON.md`](docs/DESIGN_COMPARISON.md).
+- **Estimands.** Population-average risk differences in harmful compliance, with four primary
+  hypotheses per model and Holm correction ([`docs/PROTOCOL.md`](docs/PROTOCOL.md) §4).
+- **Tests.**
+  - exact McNemar (compact) or Wilcoxon on item scores (full)
+  - bootstrap CIs over items
+  - worst/best-case missing-data bounds on every contrast
+- **Judge.** Sees only the core request and the response. Human validation (κ ≥ 0.70) is
+  required before any result is reported.
 
-Details: [`docs/PROTOCOL.md`](docs/PROTOCOL.md). Open choices that could change conclusions:
-[`docs/DECISIONS.md`](docs/DECISIONS.md).
+Open choices that could change conclusions are recorded in
+[`docs/DECISIONS.md`](docs/DECISIONS.md), not decided silently.
 
 ## Architecture
 
@@ -88,30 +111,32 @@ flowchart TB
     end
 ```
 
-Static version: [`docs/diagrams/architecture.png`](docs/diagrams/architecture.png). Source:
-[`docs/diagrams/architecture.mmd`](docs/diagrams/architecture.mmd), validated with the Mermaid
-CLI in CI.
+Module responsibilities and invariants: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Static
+diagram: [`docs/diagrams/architecture.png`](docs/diagrams/architecture.png).
 
 ## Implementation and verification status
 
 | Component | Status | Verified by |
 |---|---|---|
-| Item and config schemas; full and compact condition rendering | Implemented | Unit tests |
-| Fake, replay and recording providers | Implemented | Unit tests; strict replay e2e |
-| Response status gate, finish-reason tracking, truncation retry | Implemented | Unit tests (incl. the archived Qwen error string) |
-| Blinded, strictly parsed judge with explicit failure records | Implemented; **rubric is a draft, not validated** | Unit tests |
-| Paired statistics, Holm, bootstrap, exclusion accounting | Implemented | Unit tests against SciPy and known values |
-| Historical manifest, redaction, flags, reproduction, re-analysis | Implemented | Regression tests; CI regenerates and requires no drift |
-| Synthetic end-to-end experiment | Implemented | Injected effect recovered; null not flagged; replay exact |
+| Item and config schemas; 16- and 6-condition rendering; filler length check | Implemented | Unit tests |
+| Validity gate: API errors, error text, truncation, missing finish reasons | Implemented | Unit tests, incl. the archived Qwen error string |
+| Blinded, strictly parsed judge with explicit failure records | Implemented; **rubric not yet validated** | Unit tests |
+| Paired statistics, Holm, bootstrap, missing-data bounds | Implemented | Tests against SciPy and known values |
+| Power simulation (random intercepts and slopes, preamble-only null) | Implemented; **inputs are assumptions** | Type I error and true-effect tests |
+| Two-reviewer item-equivalence gate | Implemented | Unit tests; CLI gate |
+| Synthetic end-to-end demo with strict replay | Implemented | Ground truth recovered; committed example checked for drift |
+| Full-history release audit (blobs, commit messages, archive overlap) | Implemented | Tests incl. deleted files and unmerged branches |
 | Groq and Anthropic adapters | Implemented | **Stub clients only; never called against real APIs** |
-| Live execution | **Refused by design** until preflight, budget enforcement and approval exist | CI checks the refusal |
-| Mixed-effects model, tier B rubric, human-labelling tooling | Not implemented | — |
+| Live execution | **Refused by design** until preflight and budget enforcement exist | CI checks the refusal |
+| Mixed-effects analysis, paraphrase sets, equivalence tests, labelling tools | Planned | — |
+
+Test inventory and CI jobs: [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Historical audit (separate from validated results)
 
-The [archived 2026 experiment](https://github.com/hydrangeas20/safetylens-research) (private,
-unmodified, pinned at `b5d0dba`) compared "evaluation-style" with "deployment-style" prompts.
-Its main problems:
+An earlier private experiment compared "evaluation-style" with "deployment-style" prompts. Its
+repository is archived and kept private because it contains raw model outputs. Auditing it found
+problems that make its headline claims unsupported:
 
 | Finding | Consequence |
 |---|---|
@@ -119,88 +144,78 @@ Its main problems:
 | Failed judge calls were stored as "not refused" and kept in denominators | Refusal gaps overstated |
 | Paired data analysed with an unpaired test; the stated correction wasn't applied | Significance claims inconsistent |
 | Deploy prompts added personas and justifications on top of the wording change | Framing and pretext effects can't be separated |
-| Several "harmful" deploy prompts were arguably legitimate requests | Lower refusal isn't necessarily less safe |
-| `max_tokens=300`, no finish reasons; about half the Llama responses look truncated | Estimates rest on possibly-truncated responses |
+| `max_tokens=300`, no finish reasons recorded; about half the Llama responses look truncated | Estimates rest on possibly-truncated responses |
 
-| | Historical (archived run) | Validated v1 |
-|---|---|---|
-| Location | [`historical/`](historical/AUDIT.md) | not yet created |
-| Status | Exploratory; confounded; unvalidated judge | **Pending.** No data collected |
-| Contents | Faithful reproduction of the original statistics (matches the archive to 1e-9), and a [corrected paired re-analysis](historical/outputs/exploratory_corrected/report.md) of the two Llama models | — |
-| Supports claims about evaluation framing? | **No** | Only after the gates in the protocol |
+The audit is reproducible from redacted data committed here (hashes and derived features only):
 
-Evidence for every defect: [`docs/DEFECTS.md`](docs/DEFECTS.md). Which archived claims the
-records do and don't support: [`historical/AUDIT.md`](historical/AUDIT.md).
+- a faithful reproduction of the original statistics (matches to 1e-9)
+- a [corrected paired re-analysis](historical/outputs/exploratory_corrected/report.md), labelled
+  exploratory
 
-## Reproduce (offline, no credentials)
+Details: [`docs/DEFECTS.md`](docs/DEFECTS.md) and [`historical/AUDIT.md`](historical/AUDIT.md).
+**Nothing in the historical audit supports a claim about evaluation framing.**
+
+## Reproducibility
 
 ```bash
-uv sync --locked --python 3.11
-
+make check                                        # everything CI runs, offline
+uv run safetylens demo                            # synthetic run + strict replay
 uv run safetylens historical verify               # derived files match the SHA-256 manifest
 uv run safetylens historical audit                # regenerate flags, reproduction, re-analysis
-uv run safetylens synthetic --out runs/synthetic  # end-to-end pipeline + strict replay check
-uv run safetylens design compare --out -          # power and call-volume comparison
-uv run safetylens scan                            # secrets and unredacted-output scan
-
-make check                                        # everything CI runs
+uv run safetylens design compare --out -          # power, type I error and call volume
+uv run safetylens release-audit                   # scan every blob and commit message in history
 ```
 
 | Command | Purpose |
 |---|---|
-| `safetylens validate --config … --items …` | Validate a config and/or item file |
+| `safetylens validate --items … --review … --require-approved` | Item schema and two-reviewer equivalence gate |
 | `safetylens render --items … --design full` | Show every rendered prompt |
 | `safetylens run --config configs/synthetic.yaml --out runs/x` | Collect, judge and analyse with offline providers |
 | `safetylens analyze …` / `safetylens report …` | Analyse stored records / render a report from `results.json` |
-| `safetylens historical verify-archive --archive PATH` | Check a local archive checkout against the manifest |
-
-[CI](.github/workflows/ci.yml) runs on every pull request with no secrets and no network access
-in tests:
-
-- lint, format and strict type checks
-- tests with coverage
-- historical regression
-- offline end-to-end replay
-- a live-execution refusal check
-- the secret and redaction scan
-- README and diagram validation
 
 ## Data safety
 
-- No raw model responses to harmful requests are committed. Historical data is reduced to
-  hashes and derived features.
-- The archive stays private because it contains raw responses with operational detail.
+- No raw model responses to harmful requests, credentials or third-party benchmark text are in
+  this repository or its history.
+- `safetylens scan` and `safetylens release-audit` run in CI.
+- Policy: [`docs/DATA_POLICY.md`](docs/DATA_POLICY.md). Release audit:
+  [`docs/PUBLIC_RELEASE_AUDIT.md`](docs/PUBLIC_RELEASE_AUDIT.md). Reporting issues:
+  [`SECURITY.md`](SECURITY.md).
 
-Policy and the pre-publication checklist: [`docs/DATA_POLICY.md`](docs/DATA_POLICY.md).
-
-## Limitations and future research
+## Limitations and next steps
 
 **Limitations**
 
-- No v1 data exists. Every empirical statement here concerns the archived run and is exploratory.
+- No v1 data exists. Empirical statements here concern the archived run and are exploratory.
 - The judge rubric is a draft with no human validation.
-- Power calculations rest on assumed effect sizes and item heterogeneity, and assume
-  within-item independence, which flatters the full design.
-- Live adapters are untested against real APIs. An unverified request parameter is what
-  invalidated the archived Qwen3-32B run, so a preflight check is required.
-- The redaction scan is a safety net, not a guarantee.
+- Power calculations rest on assumed baseline rates, effect sizes and variance components.
+- Live adapters have never been exercised against real APIs. An unverified request parameter
+  is what invalidated the archived Qwen3-32B run, so a preflight check is required first.
+- The cue is a single sentence, and its length match to the filler is approximate (DEC-12).
 
 **Next steps**
 
-1. Write the v1 item set (licence and equivalence review), then settle DEC-1, DEC-2 and DEC-4.
-2. Human-labelling workflow and judge validation.
-3. Live preflight, budget enforcement, and an approved pilot to estimate the power-analysis
-   inputs.
-4. Mixed-effects secondary analysis and the tier B rubric.
+1. Write the item set; licence and two-reviewer equivalence review.
+2. Paraphrase sets for the cue, pretexts and filler (DEC-7).
+3. Human labelling and judge validation, with misclassification-corrected estimates.
+4. Live preflight, budget enforcement, and an approved pilot to estimate variance components.
+5. Freeze the protocol; equivalence tests (DEC-13) and the mixed-effects secondary analysis.
 
 ## Repository layout
 
 ```text
-src/safetylens/   package: items, config, providers, runner, quality, judge, analysis, historical, cli
-historical/       manifest, redacted archive data, generated audit outputs, AUDIT.md
-configs/          synthetic config (runnable) and v1 draft config (refused: live providers)
-data/synthetic/   inert synthetic items
-docs/             PROTOCOL, DECISIONS, DEFECTS, DESIGN_COMPARISON, DATA_POLICY, diagrams, log
-assets/           README hero banner
-tests/            unit and integration tests (offline)
+src/safetylens/     package: items, config, providers, runner, quality, judge, analysis,
+                    design, review, historical, scan, release_audit, synthetic, cli
+examples/           committed synthetic demo output (labelled synthetic)
+historical/         manifest, redacted archive data, generated audit outputs, AUDIT.md
+configs/            synthetic config (runnable) and v1 draft config (refused: live providers)
+data/synthetic/     inert synthetic items
+docs/               protocol, decisions, defects, design comparison, architecture, testing,
+                    data policy, release audit, item review, templates, diagrams, log
+tests/              unit and integration tests (offline)
 ```
+
+## License
+
+[MIT](LICENSE). Third-party benchmark items are not included; any future use follows their own
+licences.

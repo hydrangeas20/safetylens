@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from safetylens.cli import main
+from safetylens.items import design_conditions
 from safetylens.providers.replay import CassetteMissError
 from safetylens.synthetic import replay_synthetic, run_synthetic
 
@@ -25,7 +26,8 @@ def synthetic_run(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, dict[
 def test_injected_failures_are_excluded_and_counted(synthetic_run) -> None:  # type: ignore[no-untyped-def]
     _, res = synthetic_run
     integ = res["integrity"]["fake-pretext"]
-    assert integ["valid"] + sum(integ["invalid_by_reason"].values()) == integ["cells"] == 600
+    n_cells = 50 * len(design_conditions("full"))  # 40 tier A + 10 tier C items
+    assert integ["valid"] + sum(integ["invalid_by_reason"].values()) == integ["cells"] == n_cells
     assert integ["invalid_by_reason"].get("response_api_error", 0) > 0
     assert res["pipeline_counts"]["judge"]["judge_failed"] > 0
     for contrast in res["models"]["fake-pretext"]["primary_tier_A"].values():
@@ -35,12 +37,39 @@ def test_injected_failures_are_excluded_and_counted(synthetic_run) -> None:  # t
 def test_injected_effect_recovered_and_null_not_flagged(synthetic_run) -> None:  # type: ignore[no-untyped-def]
     _, res = synthetic_run
     pre = res["models"]["fake-pretext"]["primary_tier_A"]
-    for name in ("pretext_fiction_vs_none", "pretext_professional_vs_none"):
+    for name in ("pretext_fiction_vs_filler", "pretext_professional_vs_filler"):
         assert pre[name]["mean_effect_treatment_minus_reference"] > 0.3
         assert pre[name]["p_holm"] < 0.05
     assert pre["cue_explicit_vs_none"]["mean_effect_treatment_minus_reference"] == 0
     for r in res["models"]["fake-null"]["primary_tier_A"].values():
         assert r["p_holm"] >= 0.05
+
+
+def test_filler_control_separates_preamble_from_pretext(synthetic_run) -> None:  # type: ignore[no-untyped-def]
+    _, res = synthetic_run
+    prefix = res["models"]["fake-prefix"]
+    for name in ("pretext_fiction_vs_filler", "pretext_professional_vs_filler"):
+        assert prefix["primary_tier_A"][name]["mean_effect_treatment_minus_reference"] == 0
+        assert prefix["primary_tier_A"][name]["p_holm"] >= 0.05
+    control = prefix["controls_tier_A"]["filler_vs_none"]
+    assert control["mean_effect_treatment_minus_reference"] > 0.3
+    assert control["p_value"] < 0.05
+
+
+def test_report_is_labelled_synthetic(synthetic_run) -> None:  # type: ignore[no-untyped-def]
+    out, _ = synthetic_run
+    report = (out / "recorded" / "report.md").read_text()
+    assert "SYNTHETIC DATA: NOT RESEARCH RESULTS" in report.splitlines()[3]
+
+
+def test_committed_example_matches_regeneration(repo_root: Path, tmp_path: Path) -> None:
+    args = ["demo", "--out", str(tmp_path / "d"), "--write-example", str(tmp_path / "ex")]
+    assert main(args) == 0
+    for name in ("report.md", "results.json"):
+        committed = (repo_root / "examples" / "synthetic-demo" / name).read_bytes()
+        assert (tmp_path / "ex" / name).read_bytes() == committed, (
+            f"regenerate with `safetylens demo --write-example examples/synthetic-demo` ({name})"
+        )
 
 
 def test_strict_replay_reproduces_results(synthetic_run) -> None:  # type: ignore[no-untyped-def]
@@ -109,11 +138,11 @@ class TestCli:
             )
             == 0
         )
-        assert len(out.read_text().splitlines()) == 16 * 5
+        assert len(out.read_text().splitlines()) == 16 * 6
 
     def test_render_stdout(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
         main(["render", "--items", str(repo_root / "data/synthetic/items.jsonl")])
-        assert len(capsys.readouterr().out.splitlines()) == 16 * 12
+        assert len(capsys.readouterr().out.splitlines()) == 16 * 16
 
     def test_run_refuses_live_config(self, repo_root: Path, tmp_path: Path) -> None:
         cfg = repo_root / "configs/experiment_v1_draft.yaml"

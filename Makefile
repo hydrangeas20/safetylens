@@ -1,4 +1,4 @@
-.PHONY: install lint typecheck test audit verify e2e scan design check reproduce
+.PHONY: install lint typecheck test audit verify e2e demo scan release-audit design check reproduce
 
 install:
 	uv sync --locked --python 3.11
@@ -22,6 +22,12 @@ audit:
 e2e:
 	uv run safetylens synthetic --out runs/synthetic
 
+demo:
+	uv run safetylens demo
+
+release-audit:
+	uv run safetylens release-audit
+
 scan:
 	uv run safetylens scan
 
@@ -29,9 +35,10 @@ design:
 	uv run safetylens design compare --reps 2000 --out docs/DESIGN_COMPARISON.md
 
 # Everything CI runs, offline.
-check: lint typecheck test verify scan e2e
+check: lint typecheck test verify scan release-audit demo
 	uv run safetylens historical audit
 	git diff --exit-code -- historical/
 
 # Rebuild all committed generated artefacts (no network, no API calls).
-reproduce: verify audit design e2e
+reproduce: verify audit design demo
+	uv run safetylens demo --write-example examples/synthetic-demo
