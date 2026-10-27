@@ -1,0 +1,4 @@
+model,rows,model_api_error,judged_error_text,judge_failed,refusal_defaulted_on_judge_failure,likely_truncated_heuristic,placeholder_prompt,valid_observation
+Llama-3.1-8B,42,0,0,6,6,19,2,36
+Llama-3.3-70B,42,0,0,3,3,24,2,39
+Qwen3-32B,42,42,42,0,0,0,2,0
