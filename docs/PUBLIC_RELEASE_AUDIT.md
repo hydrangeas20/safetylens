@@ -108,7 +108,7 @@ Reproduce: `safetylens release-audit --archive <local safetylens-research checko
 
 | Item | Status |
 |---|---|
-| Project licence | MIT (`LICENSE`) for code and documentation |
+| Project licence | **None** (owner's decision). All rights reserved by default; GitHub's terms still let others view and fork a public repository on GitHub. An MIT `LICENSE` file existed briefly on this branch (commits `52e231a`, `9214d9f`) before removal |
 | Runtime dependencies | numpy, pandas, scipy (BSD), pydantic, PyYAML (MIT). Permissive and not vendored |
 | Dev and CI tools | pytest, ruff, mypy, coverage, Mermaid CLI (MIT/Apache). Not redistributed. `pathspec` (MPL-2.0) is a transitive dev dependency only |
 | Third-party benchmark text | None committed. HarmBench, StrongREJECT and XSTest are only named |
