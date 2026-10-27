@@ -9,6 +9,9 @@ from safetylens.cli import main
 from safetylens.release_audit import audit_history
 
 FAKE_KEY = "gsk_" + "Q" * 30
+# Built at runtime so this file's own source stays free of detectable values.
+FAKE_EMAIL = "someone" + "@" + "gmail.com"
+FAKE_HOME = "/" + "home/alice/"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -77,13 +80,13 @@ def test_raw_response_column_in_history_is_found(repo: Path) -> None:
 def test_email_and_local_path_detection(repo: Path) -> None:
     commit(
         repo,
-        {"notes.md": "contact someone@gmail.com\nok hamda@duck.com\nsee /home/alice/x\n"},
+        {"notes.md": f"contact {FAKE_EMAIL}\nok hamda@duck.com\nsee {FAKE_HOME}x\n"},
         "notes",
     )
     report = audit_history(repo)
     details = {(f.kind, f.detail) for f in report.blocking}
-    assert ("email", "someone@gmail.com") in details
-    assert ("local_path", "/home/alice/") in details
+    assert ("email", FAKE_EMAIL) in details
+    assert ("local_path", FAKE_HOME) in details
     assert not any(f.detail == "hamda@duck.com" for f in report.findings)
 
 
@@ -122,3 +125,29 @@ def test_cli_exit_codes(repo: Path, tmp_path: Path) -> None:
     assert '"blocking_count": 0' in (tmp_path / "r.json").read_text()
     commit(repo, {"k.txt": FAKE_KEY}, "leak")
     assert main(["release-audit", "--repo", str(repo)]) == 1
+
+
+def test_reviewed_false_positive_is_pinned_to_exact_blob(repo: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from safetylens import release_audit
+
+    commit(repo, {"notes.md": f"contact {FAKE_EMAIL}\n"}, "notes")
+    blob = git(repo, "rev-parse", "HEAD:notes.md").strip()
+    monkeypatch.setattr(
+        release_audit,
+        "REVIEWED_FALSE_POSITIVES",
+        {(blob, "email", FAKE_EMAIL): "fabricated"},
+    )
+    report = audit_history(repo)
+    assert report.blocking == []
+    assert any(f.kind == "reviewed:email" for f in report.findings)
+    # A different version of the same file is not exempt.
+    commit(repo, {"notes.md": f"contact {FAKE_EMAIL} again\n"}, "edit")
+    assert [f.kind for f in audit_history(repo).blocking] == ["email"]
+
+
+def test_path_allowlist_covers_email_and_path_checks(repo: Path) -> None:
+    # The audit tool's own definition file contains the patterns it detects.
+    commit(repo, {"src/safetylens/release_audit.py": f"{FAKE_EMAIL} {FAKE_HOME}\n"}, "defs")
+    assert audit_history(repo).blocking == []
+    commit(repo, {"src/other.py": f"{FAKE_EMAIL}\n"}, "elsewhere")
+    assert [f.kind for f in audit_history(repo).blocking] == ["email"]

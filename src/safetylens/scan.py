@@ -45,7 +45,13 @@ HAZARD_TERMS: tuple[str, ...] = (
 RAW_TEXT_COLUMNS = frozenset({"prompt", "response", "raw_response", "text", "completion"})
 SKIP_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".lock")
 # Files that legitimately contain the patterns above (definitions and their tests).
-ALLOWLIST = frozenset({"src/safetylens/scan.py", "tests/unit/test_scan.py"})
+ALLOWLIST = frozenset(
+    {
+        "src/safetylens/scan.py",
+        "src/safetylens/release_audit.py",  # its regexes contain the path patterns it detects
+        "tests/unit/test_scan.py",
+    }
+)
 
 
 @dataclass(frozen=True)

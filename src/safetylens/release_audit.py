@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from safetylens.scan import SKIP_SUFFIXES, scan_content
+from safetylens.scan import ALLOWLIST, SKIP_SUFFIXES, scan_content
 
 # Emails that may legitimately appear: the owner's chosen commit address, bot and
 # no-reply addresses, and documentation placeholders.
@@ -34,6 +34,19 @@ LOCAL_PATH = re.compile(
     r"/tmp/claude)"
 )
 SESSION_URL = re.compile(r"https://claude\.ai/code/session_[A-Za-z0-9]+")
+
+# Findings a person has reviewed and judged not to be disclosures, pinned to the exact
+# blob, kind and detail. Only that blob is exempt; any other version of the file, or any
+# other finding in it, is still blocking. History is permanent, so a reviewed false
+# positive cannot be removed, only documented.
+REVIEWED_FALSE_POSITIVES: dict[tuple[str, str, str], str] = {
+    ("e300168938a0fcc075b06ae033cd8386f4c1415e", "email", "someone@gmail.com"): (
+        "fabricated test input in tests/unit/test_release_audit.py (first version)"
+    ),
+    ("e300168938a0fcc075b06ae033cd8386f4c1415e", "local_path", "/home/alice/"): (
+        "fabricated test input in tests/unit/test_release_audit.py (first version)"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -100,6 +113,8 @@ def _blob_contents(repo: Path, shas: list[str]) -> dict[str, bytes]:
 
 def _text_findings(where: str, text: str, path: str | None = None) -> list[AuditFinding]:
     """Content checks; ``path`` selects file-type checks and the scanner allowlist."""
+    if (path or where) in ALLOWLIST:
+        return []
     findings = [
         AuditFinding("blocking", f.kind, where, f.detail) for f in scan_content(path or where, text)
     ]
@@ -150,7 +165,11 @@ def audit_history(
                 report.binary_blobs += 1
                 break
             report.blobs_scanned += 1
-            report.findings.extend(_text_findings(f"{path}@{sha[:7]}", text, path))
+            for f in _text_findings(f"{path}@{sha[:7]}", text, path):
+                reason = REVIEWED_FALSE_POSITIVES.get((sha, f.kind, f.detail))
+                if reason is not None:
+                    f = AuditFinding("review", f"reviewed:{f.kind}", f.where, reason)
+                report.findings.append(f)
 
     log = _git(repo, "log", "--all", "--format=%H%x00%B%x01").decode()
     for entry in filter(None, (e.strip() for e in log.split("\x01"))):

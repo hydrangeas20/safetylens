@@ -149,3 +149,10 @@ visibility change, no change to `safetylens-research`.
 - README rewritten for a first-screen summary. MIT licence after dependency licence review.
   Added SECURITY.md, CONTRIBUTING.md, ARCHITECTURE.md and TESTING.md. Removed links to the
   private archive.
+- CI run on `52e231a` failed in the history-audit job: the new audit flagged its own regex
+  source and the fabricated email and home-directory inputs in its tests. The local run had
+  passed only because it was executed before committing, so the new files weren't in history
+  yet. Fixes: the tool's definition file is allowlisted by path for all checks, like
+  `scan.py`; tests build fake values at runtime; the one pushed test blob is pinned as a
+  reviewed false positive by exact blob SHA. Release audits are now run after committing, and
+  documentation describes detected patterns without quoting them.
