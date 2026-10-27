@@ -7,7 +7,6 @@ harmful request itself is held constant. It does this with paired statistics, a 
 length-matched controls and fully offline reproducibility.**
 
 [![CI](https://github.com/hydrangeas20/safetylens/actions/workflows/ci.yml/badge.svg)](https://github.com/hydrangeas20/safetylens/actions/workflows/ci.yml)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
 ![Research status: v1 findings pending](https://img.shields.io/badge/v1%20findings-pending-lightgrey)
 
@@ -214,8 +213,3 @@ docs/               protocol, decisions, defects, design comparison, architectur
                     data policy, release audit, item review, templates, diagrams, log
 tests/              unit and integration tests (offline)
 ```
-
-## License
-
-[MIT](LICENSE). Third-party benchmark items are not included; any future use follows their own
-licences.

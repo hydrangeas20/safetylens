@@ -146,7 +146,8 @@ visibility change, no change to `safetylens-research`.
 - `safetylens demo`: one-command synthetic run plus strict replay, with a third fake model
   (`fake-prefix`) showing why the filler control matters. Committed example at
   `examples/synthetic-demo/` and checked for drift in tests.
-- README rewritten for a first-screen summary. MIT licence after dependency licence review.
+- README rewritten for a first-screen summary. An MIT licence was added after a dependency
+  licence review, then removed at the owner's request (no project licence).
   Added SECURITY.md, CONTRIBUTING.md, ARCHITECTURE.md and TESTING.md. Removed links to the
   private archive.
 - CI run on `52e231a` failed in the history-audit job: the new audit flagged its own regex
