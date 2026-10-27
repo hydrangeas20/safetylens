@@ -58,3 +58,13 @@ visibility change, no change to `safetylens-research`.
 - No banner supplied; placeholder SVG used.
 - Mixed-effects secondary model, tier B rubric, human-labelling tooling, automated
   best/worst-case bounds, live preflight and budget enforcement.
+
+### Verification
+- Local `make check` (lint, format, mypy, tests, manifest verify, scan, synthetic e2e, audit
+  regeneration with no drift): exit 0. 204 passed, 1 skipped (archive-hash test; passes
+  locally with `SAFETYLENS_ARCHIVE` set), coverage 97.1%.
+- PR #1 opened against `main`. GitHub Actions run 40446500656 on `8553ee5`: all five jobs
+  succeeded (lint/type, tests and coverage, historical regression, offline e2e, safety scan).
+  Job logs could not be downloaded from this workspace (blob storage not on the network
+  allowlist), so test counts above are from the identical local command.
+- `safetylens-research` remains at `b5d0dba` (checked with `git ls-remote`).
