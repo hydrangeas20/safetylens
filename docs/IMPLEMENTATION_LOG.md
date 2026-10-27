@@ -55,7 +55,7 @@ visibility change, no change to `safetylens-research`.
 - Renamed decision IDs to `DEC-n` to avoid clashing with defect IDs `D1–D10`.
 
 ### Not done (see handoff and `DECISIONS.md`)
-- No banner supplied; placeholder SVG used.
+- No banner supplied; placeholder SVG used. (Resolved 2026-10-27: approved banner committed.)
 - Mixed-effects secondary model, tier B rubric, human-labelling tooling, automated
   best/worst-case bounds, live preflight and budget enforcement.
 
@@ -94,3 +94,20 @@ visibility change, no change to `safetylens-research`.
   equals the source file, fragile Mermaid syntax guarded, labels quoted, banner present.
 - New CI job `docs` parses every README Mermaid block with `@mermaid-js/mermaid-cli@11.16.0`.
   Checked locally: the old README block exits 1 and the new one exits 0.
+
+### Verification (no browser available)
+- Local `make check`: exit 0; 220 passed, 1 skipped; coverage 97.1%.
+- GitHub Actions run 40526815192 on `002f498`: all six jobs succeeded, including the new
+  `README and diagram validation` job (Mermaid CLI parse of the README block on a GitHub runner).
+- GitHub REST API (`/readme`, HTML media type) on `feat/foundation`: 10 sections, 5 tables, 3 code
+  blocks, the important-alert, one Mermaid section, banner `<img src="assets/safetylens-hero.png">`,
+  CI badge and two shields.io badges proxied through camo. The banner's git blob SHA on GitHub
+  equals the local file's.
+- Offline preview: GitHub's API-rendered HTML loaded in headless Chromium, with the embedded
+  Mermaid source rendered client-side by mermaid.js 11 (the step GitHub performs in its viewer
+  iframe). Mermaid rendered without error. Banner loaded at 900x309 (desktop) and 358x123
+  (390 px phone); no horizontal scroll. External badges could not load in the sandbox (no
+  network access to shields.io/camo); this is expected and not a repository issue.
+- **Unverified:** visual inspection of the live GitHub page itself (no signed-in browser for
+  the private repository). GitHub's Mermaid viewer version is not published; compatibility is
+  inferred from Mermaid 11.16 parsing plus conservative syntax.
