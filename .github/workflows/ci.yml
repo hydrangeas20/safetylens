@@ -1,0 +1,82 @@
+name: CI
+
+# Offline only: no secrets are referenced and no paid API is ever called.
+# Tests run with network sockets disabled (pytest-socket, see pyproject.toml).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SAFETYLENS_ALLOW_LIVE: "0"
+
+jobs:
+  lint-type:
+    name: Lint, format, type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --python 3.11
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy
+
+  test:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --python 3.11
+      - run: uv run pytest --cov --cov-report=term --cov-report=xml
+
+  historical-audit:
+    name: Historical audit regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --python 3.11
+      - name: Verify derived files against manifest
+        run: uv run safetylens historical verify
+      - name: Regenerate audit outputs and require no drift
+        run: |
+          uv run safetylens historical audit
+          git diff --exit-code -- historical/
+
+  e2e:
+    name: Offline end-to-end replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --python 3.11
+      - run: uv run safetylens synthetic --out "$RUNNER_TEMP/synthetic"
+      - name: Live execution is refused
+        run: |
+          set +e
+          uv run safetylens run --config configs/experiment_v1_draft.yaml --out "$RUNNER_TEMP/live"
+          code=$?
+          test "$code" -eq 2
+
+  safety-scan:
+    name: Secret and redaction scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --python 3.11
+      - run: uv run safetylens scan
+      - name: Workflows must not reference secrets
+        run: |
+          if grep -rn 'secrets\.' .github/workflows; then
+            echo "workflows must not use secrets"; exit 1
+          fi

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 
 import numpy as np
 from scipy import stats as sps
@@ -58,12 +59,22 @@ def _target_pairs(design: str, target: str) -> list[tuple[Condition, Condition]]
     raise ValueError(target)
 
 
+@lru_cache(maxsize=32)
 def _mcnemar_reject_table(max_d: int, alpha: float) -> np.ndarray:
-    """reject[d, b] for the exact two-sided McNemar test (matches scipy binomtest)."""
+    """reject[d, b] for the exact two-sided McNemar test.
+
+    With p = 0.5 the binomial is symmetric, so the two-sided exact p-value used by
+    scipy's binomtest equals min(1, 2 * min(P(X <= b), P(X >= b))). Vectorised over b.
+    Verified cell-by-cell against binomtest in tests/unit/test_design.py.
+    """
     table = np.zeros((max_d + 1, max_d + 1), dtype=bool)
     for d in range(1, max_d + 1):
-        for b in range(d + 1):
-            table[d, b] = sps.binomtest(b, d, 0.5).pvalue <= alpha
+        b = np.arange(d + 1)
+        lower = sps.binom.cdf(b, d, 0.5)
+        upper = sps.binom.sf(b - 1, d, 0.5)
+        p = np.minimum(1.0, 2 * np.minimum(lower, upper))
+        table[d, : d + 1] = p <= alpha * (1 + 1e-12)
+    table.setflags(write=False)
     return table
 
 
@@ -160,14 +171,22 @@ def comparison_report(
         "",
         "## Power for the target contrast",
         "",
-        "| Scenario | Target | Items (tier A) | Compact power | Full power |",
-        "|---|---|---:|---:|---:|",
+        "The equal-cost column gives the compact design 12/5 as many items, so both designs "
+        "use the same number of model calls.",
+        "",
+        "| Scenario | Target | Items (tier A) | Compact power | Compact power, equal cost "
+        "(items) | Full power |",
+        "|---|---|---:|---:|---:|---:|",
     ]
     for label, sc in scenarios.items():
         for n in (60, 120, 200):
+            n_eq = round(n * 12 / 5)
             pc = simulate_power("compact", n, sc, alpha=alpha, reps=reps, seed=seed)
+            pce = simulate_power("compact", n_eq, sc, alpha=alpha, reps=reps, seed=seed)
             pf = simulate_power("full", n, sc, alpha=alpha, reps=reps, seed=seed)
-            lines.append(f"| {label} | {sc.target} | {n} | {pc:.2f} | {pf:.2f} |")
+            lines.append(
+                f"| {label} | {sc.target} | {n} | {pc:.2f} | {pce:.2f} ({n_eq}) | {pf:.2f} |"
+            )
     lines += ["", "Scenario parameters:", ""]
     for label, sc in scenarios.items():
         lines.append(f"- {label}: `{asdict(sc)}`")
@@ -193,7 +212,7 @@ def comparison_report(
         )
     lines += [
         "",
-        "## Trade-offs (for decision D1 in docs/DECISIONS.md)",
+        "## Trade-offs (for decision DEC-1 in docs/DECISIONS.md)",
         "",
         "- **Compact** costs 5/12 of the full design. It estimates each effect only at the "
         "baseline levels (terse wording, no cue, no pretext) and cannot detect interactions, "
@@ -202,6 +221,13 @@ def comparison_report(
         "item, and it estimates effects averaged over the other factors plus interactions. "
         "Its estimand differs from the compact one if interactions exist.",
         "- Both designs hold the core request constant by construction (`safetylens.items`).",
+        "- **Assumption that favours the full design:** responses to different conditions of "
+        "the same item are simulated as independent given the item intercept. If items also "
+        "differ in how strongly they respond to a factor (random slopes), the extra matched "
+        "pairs carry less independent information and the full design's advantage shrinks. "
+        "The pilot should estimate this before the design is frozen.",
+        "- Null calibration (checked with 20,000 replications at alpha = 0.05/12): exact McNemar "
+        "is conservative; the Wilcoxon test on item scores holds its nominal level.",
         "",
     ]
     return "\n".join(lines)

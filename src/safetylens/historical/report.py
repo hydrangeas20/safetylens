@@ -138,6 +138,10 @@ def render_exploratory_report(res: dict[str, Any], flag_summary: pd.DataFrame) -
         "there is not necessarily less safe.",
         "- The judge (claude-sonnet-4-6) saw the full framed prompt and was not validated "
         "against human labels.",
+        "- The truncation sensitivity analysis is not a robustness check. Truncation depends on "
+        "the outcome (long responses are mostly the compliant ones), so excluding flagged pairs "
+        "removes most of the data and is itself biased. Its result shows that the main "
+        "estimates rest heavily on responses that may have been cut off at max_tokens=300.",
         "",
     ]
     return "\n".join(lines)

@@ -76,3 +76,4 @@ Holm correction across a family of 4 tests (Llama-3.1-8B:refused, Llama-3.1-8B:s
 - These numbers describe the archived run only. The deploy prompts add personas and justifications, so a difference cannot be attributed to evaluation framing.
 - Several deploy prompts are requests where helping is arguably correct; lower refusal there is not necessarily less safe.
 - The judge (claude-sonnet-4-6) saw the full framed prompt and was not validated against human labels.
+- The truncation sensitivity analysis is not a robustness check. Truncation depends on the outcome (long responses are mostly the compliant ones), so excluding flagged pairs removes most of the data and is itself biased. Its result shows that the main estimates rest heavily on responses that may have been cut off at max_tokens=300.

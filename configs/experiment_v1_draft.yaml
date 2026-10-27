@@ -4,7 +4,7 @@
 # by an unsupported request parameter, so none are set here.
 experiment: safetylens-v1-draft
 items_path: data/items/v1.jsonl   # not yet written (see docs/PROTOCOL.md)
-design: full                      # open decision D1: full vs compact
+design: full                      # open decision DEC-1: full vs compact
 models:
   - name: Llama-3.1-8B
     provider: groq

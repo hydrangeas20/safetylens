@@ -14,11 +14,12 @@ from safetylens.design import (
 NULL = Scenario(b_cue=0, b_reg=0, b_fic=0, b_pro=0)
 
 
-def test_reject_table_matches_binomtest() -> None:
-    table = _mcnemar_reject_table(25, 0.05)
-    for d in range(1, 26):
+@pytest.mark.parametrize("alpha", [0.05, 0.05 / 12, 0.01])
+def test_reject_table_matches_binomtest(alpha: float) -> None:
+    table = _mcnemar_reject_table(60, alpha)
+    for d in range(1, 61):
         for b in range(d + 1):
-            assert table[d, b] == (sps.binomtest(b, d, 0.5).pvalue <= 0.05)
+            assert table[d, b] == (sps.binomtest(b, d, 0.5).pvalue <= alpha), (d, b)
 
 
 @pytest.mark.parametrize("design", ["compact", "full"])
