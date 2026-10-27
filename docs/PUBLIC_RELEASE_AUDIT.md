@@ -32,7 +32,9 @@ Some surfaces could not be inspected from the audit environment ([§5](#5-what-c
 | Actions artifacts | None |
 | Issues, PR comments, reviews | None. PR #1 has a description only |
 
-Reproduce: `safetylens release-audit` (CI runs it on every push with full history).
+Reproduce: `safetylens release-audit` (CI runs it on every push with full history). The
+counts above describe history before this audit's branch. Later commits are covered by the
+CI job, which first failed on this branch and was fixed as described in §3.
 
 ## 2. Archive separation
 
@@ -57,6 +59,7 @@ Reproduce: `safetylens release-audit --archive <local safetylens-research checko
 | JSONL with non-synthetic model output | None (only `[SYNTHETIC-…]` markers) |
 | Image metadata (PNG text/EXIF chunks) | None in `assets/safetylens-hero.png` or `docs/diagrams/architecture.png` |
 | Hazard terms | Present only in the scanner's own keyword list (`src/safetylens/scan.py`) and its test. They are general-knowledge precursor and component names used for detection, with no quantities or procedures |
+| Audit tool's own patterns and fake inputs | `src/safetylens/release_audit.py` contains the path patterns it detects and is path-allowlisted like `scan.py`. The first pushed version of `tests/unit/test_release_audit.py` (blob `e300168`) contains a fabricated email and home path. That exact blob and those two findings are pinned in `REVIEWED_FALSE_POSITIVES`, and later versions build the values at runtime so they stay fully scanned |
 
 ## 4. Manual review performed during this audit
 
