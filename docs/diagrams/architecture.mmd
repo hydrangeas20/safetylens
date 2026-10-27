@@ -1,0 +1,23 @@
+flowchart TB
+    subgraph pipeline["Evaluation pipeline (offline by default)"]
+        direction TB
+        items["Items JSONL: tiered and schema-validated"] --> render["Condition renderer: cue x register x pretext"]
+        config["Experiment config: pydantic schema"] --> runner
+        render --> runner["Runner: resumable, retries, truncation retry"]
+        runner --> provider{"Provider"}
+        provider --> fake["Fake"]
+        provider --> replay["Replay: strict cassette"]
+        provider -.-> live["Groq or Anthropic: disabled by default"]
+        runner --> gate["Quality gate: response status and finish reason"]
+        gate --> responses[("responses.jsonl: append-only")]
+        responses --> judge["Blinded judge: strict JSON schema"]
+        judge --> judgments[("judgments.jsonl: append-only")]
+        responses --> analysis["Analysis: valid pairs only, McNemar or Wilcoxon, bootstrap CI, Holm"]
+        judgments --> analysis
+        analysis --> outputs["results.json and report.md"]
+    end
+    subgraph history["Historical audit"]
+        direction TB
+        archive[("Private archive: safetylens-research, commit b5d0dba")] -->|"redact and hash"| redacted["historical/redacted"]
+        redacted --> audit["Flags, faithful reproduction, exploratory re-analysis"]
+    end

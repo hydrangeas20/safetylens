@@ -1,0 +1,9 @@
+{
+  "label": "HISTORICAL CALCULATION - original method reproduced, defects included",
+  "mismatches": {
+    "divergence_summary": [],
+    "refusal_rates": [],
+    "stats": []
+  },
+  "tolerance_abs": 1e-09
+}

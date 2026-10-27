@@ -1,0 +1,100 @@
+{
+  "archive": {
+    "commit": "b5d0dba906b2d6bbeb0bdfc0cbc958079e8ac3cc",
+    "files": {
+      "README.md": {
+        "bytes": 6052,
+        "sha256": "0b7c9d924cc266663912d93cdb2a36f4b46f80dee4bce8ad418b8e2ba2b8e90f"
+      },
+      "data/prompt_pairs.json": {
+        "bytes": 7011,
+        "sha256": "b03f394298766c6ee5d97dfd52255a31a0390372fe43a827990171b76c37e423"
+      },
+      "figures/divergence_by_category.png": {
+        "bytes": 109389,
+        "sha256": "b1b63e511c0751d2aead7d5359de37af765bba9658da28873fbcbd5b6c7af5f7"
+      },
+      "figures/evaluation_pipeline.png": {
+        "bytes": 1763230,
+        "sha256": "00b272198748247bce1bd37be6d86e815d78af15c148c9fc8d0cffe3a07f5a89"
+      },
+      "figures/notebook/SafetyLens.ipynb": {
+        "bytes": 257201,
+        "sha256": "76908828244c736e42968bc5400f08d46a50d70d8f71db6a755a194e294ddb7c"
+      },
+      "figures/refusal_rates.png": {
+        "bytes": 70331,
+        "sha256": "00b8c19cc5764eefb465dce24d2c2d3e754cc1449754280947c936e8a3cf8f53"
+      },
+      "figures/scale_analysis.png": {
+        "bytes": 58794,
+        "sha256": "ceeecb2e2fa9e793ef9f22f8f6fafc2b0fe1f404ec617e27fc4dad8871ce5d16"
+      },
+      "requirements.txt": {
+        "bytes": 55,
+        "sha256": "131f13637916039d28c057956c4f1e39f04d01e56e4502a196f9da258007a40d"
+      },
+      "results/divergence_summary.csv": {
+        "bytes": 751,
+        "sha256": "4189c4faf2d11fac9479c50e4dabc524ee045387d457a6ccd8b1719b2dba818b"
+      },
+      "results/refusal_rates.csv": {
+        "bytes": 515,
+        "sha256": "51194cc367312602d477154e26cadacaec13d6c494b3083a8eb493ce4acb2491"
+      },
+      "results/report.md": {
+        "bytes": 6785,
+        "sha256": "f964e61ec7000b723dde7c3b4a8958256c79f72e19eee12a479a392af4fd3692"
+      },
+      "results/results.json": {
+        "bytes": 5356,
+        "sha256": "e8c62189de5027a2fdf5d50bb1bfa627150f4fd22f7067c617c0908b71825e42"
+      },
+      "results/safetylens_Llama-3.1-8B.csv": {
+        "bytes": 47428,
+        "sha256": "105cd9f9756bf8f1d0e9173f964cd7704991581c80b3f46e6a93413b893c5f16"
+      },
+      "results/safetylens_Llama-3.3-70B.csv": {
+        "bytes": 62380,
+        "sha256": "04c980a6777c8fff9b8773633b7e01c0a2a8491bd647801ad3301d621c9a7e61"
+      },
+      "results/safetylens_Qwen3-32B.csv": {
+        "bytes": 18909,
+        "sha256": "8b2d5506579a3f7dcf9191fb5765a384574a7a7abb0ecc04225cad766b9f7f7d"
+      },
+      "results/stats.csv": {
+        "bytes": 449,
+        "sha256": "f3527d32e2d965028101a0a084157de42ec8bed0cc8cbefd0629c87c7d6482c0"
+      }
+    },
+    "repository": "https://github.com/hydrangeas20/safetylens-research",
+    "visibility_note": "private; contains raw model outputs that must not be published"
+  },
+  "derived": {
+    "historical/original_outputs/divergence_summary.csv": {
+      "bytes": 751,
+      "sha256": "4189c4faf2d11fac9479c50e4dabc524ee045387d457a6ccd8b1719b2dba818b"
+    },
+    "historical/original_outputs/refusal_rates.csv": {
+      "bytes": 515,
+      "sha256": "51194cc367312602d477154e26cadacaec13d6c494b3083a8eb493ce4acb2491"
+    },
+    "historical/original_outputs/stats.csv": {
+      "bytes": 449,
+      "sha256": "f3527d32e2d965028101a0a084157de42ec8bed0cc8cbefd0629c87c7d6482c0"
+    },
+    "historical/redacted/Llama-3.1-8B.csv": {
+      "bytes": 16598,
+      "sha256": "73856a4814b28c9b4e6c17ee44dab4e4e34a5357a748af742bbaa91254b78b49"
+    },
+    "historical/redacted/Llama-3.3-70B.csv": {
+      "bytes": 17803,
+      "sha256": "3b32da1b77fb2f3d1ccb017476cba0ea98660f58f5de043a713fb43718516875"
+    },
+    "historical/redacted/Qwen3-32B.csv": {
+      "bytes": 15591,
+      "sha256": "59751561536b90c63eca60912a311c0d6ad4cbb5533493236fe7e9bd97cc9240"
+    }
+  },
+  "manifest_version": 1
+}

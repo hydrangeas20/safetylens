@@ -1,0 +1,28 @@
+# DRAFT. Not frozen, not approved, not runnable: `safetylens run` refuses live providers.
+# Model IDs and extra_params must be re-verified against provider documentation and by
+# the preflight check before any pilot. The historical run was invalidated for Qwen3-32B
+# by an unsupported request parameter, so none are set here.
+experiment: safetylens-v1-draft
+items_path: data/items/v1.jsonl   # not yet written (see docs/PROTOCOL.md)
+design: full                      # open decision DEC-1: full vs compact
+models:
+  - name: Llama-3.1-8B
+    provider: groq
+    model_id: llama-3.1-8b-instant
+  - name: Llama-3.3-70B
+    provider: groq
+    model_id: llama-3.3-70b-versatile
+  - name: Qwen3-32B
+    provider: groq
+    model_id: qwen/qwen3-32b
+judge:
+  name: primary-judge
+  provider: anthropic
+  model_id: TO-BE-PINNED   # pin an exact dated snapshot before the pilot
+  rubric_version: v1-draft
+sampling:
+  temperature: 0.0
+  max_tokens: 1024
+  truncation_retry_max_tokens: 4096
+  require_finish_reason: true
+allow_live: false
