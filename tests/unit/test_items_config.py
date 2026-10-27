@@ -29,7 +29,11 @@ def base_item(**over: object) -> dict[str, object]:
         "core_request": "CORE",
         "terse": "CORE",
         "conversational": "hello CORE",
-        "pretexts": {"fiction": "story.", "professional": "job."},
+        "pretexts": {
+            "filler": "It is sunny.",
+            "fiction": "A short story.",
+            "professional": "For my job.",
+        },
         "compliance_appropriate": "never",
     }
     data.update(over)
@@ -37,13 +41,14 @@ def base_item(**over: object) -> dict[str, object]:
 
 
 class TestDesign:
-    def test_full_has_twelve_unique_conditions(self) -> None:
-        conds = full_design()
-        assert len(conds) == 12 == len(set(conds))
+    def test_full_has_sixteen_unique_conditions(self) -> None:
+        conds = full_design()  # 2 cues x 2 registers x 4 pretext levels (incl. filler)
+        assert len(conds) == 16 == len(set(conds))
 
     def test_compact_is_subset_of_full_and_includes_baseline(self) -> None:
         assert set(compact_design()) <= set(full_design())
-        assert BASELINE in compact_design() and len(compact_design()) == 5
+        assert BASELINE in compact_design() and len(compact_design()) == 6
+        assert Condition("none", "terse", "filler") in compact_design()
 
     def test_condition_code_roundtrip(self) -> None:
         for c in full_design():
@@ -63,7 +68,7 @@ class TestRender:
         item = synthetic_items(n_a=1, n_c=0)[0]
         prompts = [render(item, c) for c in full_design()]
         assert all(item.core_request in p for p in prompts)
-        assert len(set(prompts)) == 12
+        assert len(set(prompts)) == 16
 
     def test_cue_only_when_explicit(self) -> None:
         item = synthetic_items(n_a=1, n_c=0)[0]
@@ -76,6 +81,7 @@ class TestRender:
             p = render(item, c)
             assert (item.pretexts["fiction"] in p) == (c.pretext == "fiction")
             assert (item.pretexts["professional"] in p) == (c.pretext == "professional")
+            assert (item.pretexts["filler"] in p) == (c.pretext == "filler")
 
     def test_override_used(self) -> None:
         code = BASELINE.code
@@ -95,7 +101,27 @@ class TestItemValidation:
             ({"tier": "C"}, "requires always"),
             ({"overrides": {BASELINE.code: "drops the request"}}, "override"),
             ({"overrides": {"cue=x|reg=terse|pre=none": "CORE"}}, "invalid condition"),
-            ({"pretexts": {"fiction": "story."}}, "pretexts"),
+            ({"pretexts": {"fiction": "story.", "professional": "job."}}, "filler"),
+            (
+                {
+                    "pretexts": {
+                        "filler": "The weather is mild and the sky is clear and calm today.",
+                        "fiction": "A story.",
+                        "professional": "My job.",
+                    }
+                },
+                "length-matched",
+            ),
+            (
+                {
+                    "pretexts": {
+                        "filler": "It is sunny.",
+                        "fiction": "CORE in a story.",
+                        "professional": "For my job.",
+                    }
+                },
+                "must not restate",
+            ),
             ({"id": "bad id!"}, "pattern"),
             ({"unexpected": 1}, "Extra inputs"),
         ],

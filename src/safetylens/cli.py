@@ -53,6 +53,21 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         items = load_items(Path(args.items))
         tiers = {t: sum(i.tier == t for i in items) for t in "ABC"}
         print(f"items OK: {len(items)} items {tiers}")
+        if args.review:
+            from collections import Counter
+
+            from safetylens.review import load_reviews, review_status
+
+            status = review_status(items, load_reviews(Path(args.review)))
+            counts = Counter(status.values())
+            print("item review:", dict(sorted(counts.items())))
+            for item_id, st in sorted(status.items()):
+                if st != "approved":
+                    print(f"  {item_id}: {st}")
+            if args.require_approved and counts.get("approved", 0) != len(items):
+                return 1
+    elif args.review:
+        raise SystemExit("--review requires --items")
     return 0
 
 
@@ -151,6 +166,40 @@ def _cmd_synthetic(args: argparse.Namespace) -> int:
     return 0 if identical else 1
 
 
+def _cmd_demo(args: argparse.Namespace) -> int:
+    import shutil
+
+    from safetylens.synthetic import run_demo
+
+    out = Path(args.out)
+    demo = run_demo(out)
+    res = demo.results
+    print("SafetyLens synthetic demo (SYNTHETIC DATA: NOT RESEARCH RESULTS)")
+    print(f"design: {res['design']}, models: {', '.join(sorted(res['models']))}")
+    for model, integ in sorted(res["integrity"].items()):
+        print(
+            f"  {model}: {integ['valid']}/{integ['cells']} valid cells; "
+            f"excluded {integ['invalid_by_reason'] or 'none'}"
+        )
+    print("primary contrasts (effect [95% CI], Holm p):")
+    for model, block in sorted(res["models"].items()):
+        for name, r in sorted(block["primary_tier_A"].items()):
+            ci = r["bootstrap_95ci"]
+            print(
+                f"  {model:13} {name:34} {r['mean_effect_treatment_minus_reference']:+.3f} "
+                f"[{ci['low']:+.3f}, {ci['high']:+.3f}]  p_holm={r['p_holm']:.4f}"
+            )
+    print(f"strict replay reproduces results and report exactly: {demo.replay_identical}")
+    print(f"report: {demo.report_path}")
+    if args.write_example:
+        dest = Path(args.write_example)
+        dest.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(demo.report_path, dest / "report.md")
+        shutil.copyfile(out / "recorded" / "results.json", dest / "results.json")
+        print(f"example copied to {dest}")
+    return 0 if demo.replay_identical else 1
+
+
 def _cmd_analyze(args: argparse.Namespace) -> int:
     from safetylens.analysis.experiment import analyse_experiment, render_report
     from safetylens.records import JudgmentRecord, ResponseRecord
@@ -187,6 +236,22 @@ def _cmd_design(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_release_audit(args: argparse.Namespace) -> int:
+    from safetylens.historical import ORIGINAL_OUTPUT_FILES
+    from safetylens.release_audit import audit_history, render_summary
+
+    # The three aggregate tables are copied verbatim from the archive on purpose.
+    report = audit_history(
+        Path(args.repo),
+        archive=Path(args.archive) if args.archive else None,
+        allowed_archive_paths=ORIGINAL_OUTPUT_FILES,
+    )
+    print(render_summary(report))
+    if args.json:
+        Path(args.json).write_text(json.dumps(report.as_dict(), indent=2) + "\n")
+    return 1 if report.blocking else 0
+
+
 def _cmd_scan(args: argparse.Namespace) -> int:
     from safetylens.scan import scan_repo
 
@@ -210,6 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     v = sub.add_parser("validate", help="validate a config and/or items file")
     v.add_argument("--config")
     v.add_argument("--items")
+    v.add_argument("--review", help="item-equivalence review CSV (docs/ITEM_REVIEW.md)")
+    v.add_argument(
+        "--require-approved",
+        action="store_true",
+        help="exit 1 unless every item has two passing reviews",
+    )
     v.set_defaults(func=_cmd_validate)
 
     r = sub.add_parser("render", help="render prompts for every item x condition")
@@ -230,6 +301,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", default=tempfile.gettempdir() + "/safetylens-synthetic")
     s.add_argument("--design", choices=["full", "compact"], default="full")
     s.set_defaults(func=_cmd_synthetic)
+
+    dm = sub.add_parser("demo", help="one-command offline demo: synthetic run + strict replay")
+    dm.add_argument("--out", default="runs/demo")
+    dm.add_argument("--write-example", help="also copy report.md and results.json here")
+    dm.set_defaults(func=_cmd_demo)
 
     a = sub.add_parser("analyze", help="analyse stored responses and judgments")
     a.add_argument("--responses", required=True)
@@ -254,6 +330,12 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--reps", type=int, default=2000)
     d.add_argument("--out", default="-")
     d.set_defaults(func=_cmd_design)
+
+    ra = sub.add_parser("release-audit", help="scan every blob and commit message in git history")
+    ra.add_argument("--repo", default=".")
+    ra.add_argument("--archive", help="local archive checkout: prove no objects are shared")
+    ra.add_argument("--json", help="write the full report as JSON")
+    ra.set_defaults(func=_cmd_release_audit)
 
     sc = sub.add_parser("scan", help="scan tracked files for secrets and unredacted output")
     sc.add_argument("--root", default=".")
