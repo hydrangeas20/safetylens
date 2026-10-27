@@ -47,6 +47,8 @@ class SamplingSpec(_Strict):
     truncation_retry_max_tokens: int | None = Field(default=4096, gt=0)
     max_attempts: int = Field(default=3, ge=1, le=10)
     require_finish_reason: bool = True
+    # Seeded shuffle of the call order across all cells (see runner.collect).
+    randomize_order: bool = True
 
 
 class ExperimentConfig(_Strict):

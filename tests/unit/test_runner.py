@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from safetylens.config import ExperimentConfig, JudgeSpec, ModelSpec, SamplingSpec
+from safetylens.items import design_conditions
 from safetylens.providers.base import LiveCallsDisabledError
 from safetylens.providers.fake import FakeModelProvider
 from safetylens.records import FinishReason, ProviderRequest, ProviderResult, ResponseRecord
@@ -13,6 +14,9 @@ from safetylens.records import ResponseStatus as S
 from safetylens.runner import collect
 from safetylens.storage import JsonlStore
 from safetylens.synthetic import synthetic_items
+
+N_COMPACT = len(design_conditions("compact"))
+N_FULL = len(design_conditions("full"))
 
 
 def config(design: str = "compact", **sampling: object) -> ExperimentConfig:
@@ -69,7 +73,7 @@ def test_still_truncated_after_retry_stays_truncated(tmp_path: Path) -> None:
     counts = collect(
         cfg, synthetic_items(1, 0), {"m": Scripted([TRUNC])}, st, run_id="r", clock=lambda: "t"
     )
-    assert counts == {"final_truncated": 5}
+    assert counts == {"final_truncated": N_COMPACT}
     assert all(
         len([r for r in st.all() if r.cell_key == k]) == 2 for k in {r.cell_key for r in st.all()}
     )
@@ -85,8 +89,8 @@ def test_error_text_never_becomes_ok(tmp_path: Path) -> None:
         run_id="r",
         clock=lambda: "t",
     )
-    assert counts == {"final_error_text": 5}
-    assert all(r.status is S.ERROR_TEXT for r in st.all()) and len(st.all()) == 15
+    assert counts == {"final_error_text": N_COMPACT}
+    assert all(r.status is S.ERROR_TEXT for r in st.all()) and len(st.all()) == 3 * N_COMPACT
 
 
 def test_resume_appends_nothing_when_complete(tmp_path: Path) -> None:
@@ -99,7 +103,7 @@ def test_resume_appends_nothing_when_complete(tmp_path: Path) -> None:
     counts = collect(cfg, items, {"m": prov}, st, run_id="r", clock=lambda: "t")
     # Terminal cells are skipped; only non-terminal cells (if any) get new attempts.
     non_terminal = [k for k, s in finals_before.items() if s not in (S.OK, S.PROVIDER_FILTER)]
-    assert counts.get("skipped_complete", 0) == 48 - len(non_terminal)
+    assert counts.get("skipped_complete", 0) == 4 * N_FULL - len(non_terminal)
     assert len(st.path.read_text().splitlines()) >= n_lines
 
 
@@ -146,3 +150,26 @@ def test_corrupt_store_line_raises(tmp_path: Path) -> None:
 def test_store_type_check(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         store(tmp_path).append(OK)  # type: ignore[arg-type]
+
+
+def _call_order(tmp_path: Path, name: str, **sampling: object) -> list[tuple[str, str]]:
+    st = JsonlStore(tmp_path / f"{name}.jsonl", ResponseRecord)
+    cfg = config(design="full", **sampling)
+    collect(cfg, synthetic_items(3, 1), {"m": Scripted([OK])}, st, run_id="r", clock=lambda: "t")
+    return [(r.item_id, r.condition) for r in st.all()]
+
+
+def test_call_order_is_randomized_reproducibly_and_complete(tmp_path: Path) -> None:
+    nested = _call_order(tmp_path, "nested", randomize_order=False)
+    shuffled = _call_order(tmp_path, "a")
+    assert shuffled == _call_order(tmp_path, "b")  # same seed -> same order
+    assert shuffled != nested  # order is not the nested item x condition order
+    assert sorted(shuffled) == sorted(nested)  # same cells, each exactly once
+    assert len(set(shuffled)) == 4 * N_FULL
+    assert _call_order(tmp_path, "c", seed=1) != shuffled  # seed changes the order
+
+
+def test_nested_order_when_randomization_disabled(tmp_path: Path) -> None:
+    order = _call_order(tmp_path, "n", randomize_order=False)
+    items = [i for i, _ in order]
+    assert items == sorted(items, key=items.index)  # items appear in contiguous blocks

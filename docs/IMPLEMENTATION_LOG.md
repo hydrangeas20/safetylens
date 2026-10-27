@@ -115,3 +115,64 @@ visibility change, no change to `safetylens-research`.
   an `<img src=...>` quoted inside inline code in this log as a real image. The log-only commit
   had been pushed without rerunning the suite locally. Fix: the checker now ignores inline code
   and fenced blocks, and a new test confirms it still catches real broken links and images.
+
+## 2026-10-27: public-release readiness (branch `release/public-readiness`)
+
+### Disclosure audit
+- Mirrored the repository with all branches and `refs/pull/*`, then scanned all 94 historical
+  blobs and 8 commit messages. Checked archive object overlap against a local archive checkout,
+  searched for all 42 archive prompts and 415 response windows, and read every retained judge
+  rationale. No blocking content. Verdict and manual items: `docs/PUBLIC_RELEASE_AUDIT.md`.
+- Added `safetylens release-audit` (full-history scan, email and local-path checks, archive
+  overlap with an allowlist) and run it in CI with `fetch-depth: 0`. Writing its tests caught
+  two bugs in the tool itself: the scanner allowlist was matched against `path@sha` labels, and
+  identical directory trees were flagged as archive leaks. Trees are now excluded; commits and
+  blobs are checked.
+
+### Protocol rigour
+- New pretext level `filler`: a length-matched neutral sentence, validated within
+  max(2 words, 25%) of the mean pretext length. Full design is now 16 conditions, compact 6.
+- Primary pretext contrasts are now pretext vs filler. `filler_vs_none` and
+  `cue_explicit_vs_filler` are reported as controls outside the Holm family.
+- Every contrast reports exclusion rate, a >5% flag and worst/best-case missing-data bounds.
+- Power model rewritten: separate preamble and content effects, item random slopes, reported
+  probability-scale estimands, and a type I table under correlated nulls (0.030–0.050 at
+  nominal 0.05).
+- Protocol rewritten with estimands, hypotheses, controls, paraphrase plan, missing-data and
+  truncation policies. Added a two-reviewer item-equivalence gate (`safetylens.review`, CLI
+  `--review --require-approved`), checklist and template.
+
+### Demonstration and presentation
+- `safetylens demo`: one-command synthetic run plus strict replay, with a third fake model
+  (`fake-prefix`) showing why the filler control matters. Committed example at
+  `examples/synthetic-demo/` and checked for drift in tests.
+- README rewritten for a first-screen summary. An MIT licence was added after a dependency
+  licence review, then removed at the owner's request (no project licence).
+  Added SECURITY.md, CONTRIBUTING.md, ARCHITECTURE.md and TESTING.md. Removed links to the
+  private archive.
+- CI run on `52e231a` failed in the history-audit job: the new audit flagged its own regex
+  source and the fabricated email and home-directory inputs in its tests. The local run had
+  passed only because it was executed before committing, so the new files weren't in history
+  yet. Fixes: the tool's definition file is allowlisted by path for all checks, like
+  `scan.py`; tests build fake values at runtime; the one pushed test blob is pinned as a
+  reviewed false positive by exact blob SHA. Release audits are now run after committing, and
+  documentation describes detected patterns without quoting them.
+
+## 2026-10-27: focused sprint after PR #1 merged (branch `release/v1-public-audit`)
+
+- PR #1 was squash-merged, so `main` (`f32f80d`) no longer shares commits with PR #2. Its tree
+  is byte-identical to PR #1's head, so PR #2's three commits were cherry-picked onto `main`
+  unchanged; the resulting tree equals PR #2's head.
+- **Audit:** fresh mirror with all `refs/pull/*`; `release-audit --archive` gives 0 blocking
+  findings over 12 commits and 140 blobs. Actions: 9 runs, 0 artifacts, no secrets or caches.
+  Logs can't be downloaded here, so every CI job's commands were rerun locally and the full
+  output was scanned. `docs/PUBLIC_RELEASE_AUDIT.md` rewritten as a concise current report:
+  PASS.
+- **Protocol:** evaluation-framing effects vs evaluation awareness (§1.1, with a planned
+  manipulation check), experimental units, randomization, pre-specified exclusions, and a full
+  human judge-validation plan. The κ precision claim was checked numerically and corrected:
+  200 responses give about ±0.09, not ±0.07. New open decisions DEC-14 to DEC-16.
+- **Randomization implemented:** `runner.collect` now shuffles the full cell plan with a seeded
+  RNG (`sampling.randomize_order`, default on). Tests check that it is reproducible, complete,
+  seed-dependent, and off when disabled. The committed demo example is unchanged, because fake
+  outputs depend on the cell, not the call order.

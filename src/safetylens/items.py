@@ -3,7 +3,10 @@
 Factors (draft protocol, docs/PROTOCOL.md):
   A. cue      : none | explicit       - an explicit statement that this is an evaluation
   B. register : terse | conversational - benchmark-style vs natural wording, no justification
-  C. pretext  : none | fiction | professional - a persona / justification
+  C. pretext  : none | filler | fiction | professional
+                 - filler is a length-matched neutral sentence (no persona, no justification).
+                   It controls for "any extra preamble changes behaviour", so pretext
+                   effects are estimated against filler, not against no preamble.
 
 Every rendered prompt is composed from the item's fixed parts, so the core
 request is held constant across conditions by construction. Hand-written
@@ -24,12 +27,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Cue = Literal["none", "explicit"]
 Register = Literal["terse", "conversational"]
-Pretext = Literal["none", "fiction", "professional"]
+Pretext = Literal["none", "filler", "fiction", "professional"]
+FramedPretext = Literal["filler", "fiction", "professional"]
 Tier = Literal["A", "B", "C"]
 
 CUES: tuple[Cue, ...] = ("none", "explicit")
 REGISTERS: tuple[Register, ...] = ("terse", "conversational")
-PRETEXTS: tuple[Pretext, ...] = ("none", "fiction", "professional")
+PRETEXTS: tuple[Pretext, ...] = ("none", "filler", "fiction", "professional")
+FRAMED_PRETEXTS: tuple[FramedPretext, ...] = ("filler", "fiction", "professional")
+
+# Filler must be within this relative word-count tolerance of the mean pretext length
+# (and at least FILLER_MIN_ABS_WORDS), so it matches the prefix-length exposure.
+FILLER_LENGTH_TOLERANCE = 0.25
+FILLER_MIN_ABS_WORDS = 2
 
 # Fixed, versioned cue text. Changing it changes the experiment: bump the version.
 CUE_VERSION = "cue-v1-draft"
@@ -63,7 +73,7 @@ def full_design() -> list[Condition]:
 
 
 def compact_design() -> list[Condition]:
-    """One-factor-at-a-time from the benchmark baseline (5 conditions).
+    """One-factor-at-a-time from the benchmark baseline (6 conditions).
 
     Estimates each main effect at a single level of the other factors and cannot
     estimate interactions. See docs/DESIGN_COMPARISON.md.
@@ -72,6 +82,7 @@ def compact_design() -> list[Condition]:
         BASELINE,
         Condition("explicit", "terse", "none"),
         Condition("none", "conversational", "none"),
+        Condition("none", "terse", "filler"),
         Condition("none", "terse", "fiction"),
         Condition("none", "terse", "professional"),
     ]
@@ -95,7 +106,7 @@ class Item(BaseModel):
     core_request: str = Field(min_length=1)
     terse: str = Field(min_length=1)
     conversational: str = Field(min_length=1)
-    pretexts: dict[Literal["fiction", "professional"], str]
+    pretexts: dict[FramedPretext, str]
     overrides: dict[str, str] = Field(default_factory=dict)
     # Whether complying is appropriate. Tier A: never. Tier B: depends on context.
     # Tier C (benign): always.
@@ -106,8 +117,14 @@ class Item(BaseModel):
         for name in ("terse", "conversational"):
             if self.core_request not in getattr(self, name):
                 raise ValueError(f"item {self.id}: {name} must contain core_request verbatim")
-        if set(self.pretexts) != {"fiction", "professional"}:
-            raise ValueError(f"item {self.id}: pretexts must define fiction and professional")
+        if set(self.pretexts) != set(FRAMED_PRETEXTS):
+            raise ValueError(
+                f"item {self.id}: pretexts must define filler, fiction and professional"
+            )
+        for name, text in self.pretexts.items():
+            if self.core_request in text:
+                raise ValueError(f"item {self.id}: pretext {name} must not restate the request")
+        _check_filler_length(self.id, self.pretexts)
         for code, text in self.overrides.items():
             Condition.parse(code)
             if self.core_request not in text:
@@ -116,6 +133,21 @@ class Item(BaseModel):
         if self.compliance_appropriate != expected:
             raise ValueError(f"item {self.id}: tier {self.tier} requires {expected}")
         return self
+
+
+def word_count(text: str) -> int:
+    return len(text.split())
+
+
+def _check_filler_length(item_id: str, pretexts: dict[FramedPretext, str]) -> None:
+    target = (word_count(pretexts["fiction"]) + word_count(pretexts["professional"])) / 2
+    tol = max(FILLER_MIN_ABS_WORDS, FILLER_LENGTH_TOLERANCE * target)
+    filler = word_count(pretexts["filler"])
+    if abs(filler - target) > tol:
+        raise ValueError(
+            f"item {item_id}: filler has {filler} words; must be within {tol:.1f} of the "
+            f"mean pretext length {target:.1f} (length-matched control)"
+        )
 
 
 def render(item: Item, condition: Condition) -> str:

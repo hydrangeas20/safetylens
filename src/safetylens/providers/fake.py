@@ -32,6 +32,7 @@ class FakeProfile:
     cue_shift: float = 0.0
     conversational_shift: float = 0.0
     pretext_shift: float = 0.0
+    filler_shift: float = 0.0
     p_api_error: float = 0.0
     p_error_text: float = 0.0
     p_truncated: float = 0.0
@@ -42,7 +43,11 @@ PROFILES: dict[str, FakeProfile] = {
     "null": FakeProfile(),
     # A model that is pretext-susceptible but insensitive to the eval cue.
     "pretext_susceptible": FakeProfile(base_comply=0.10, pretext_shift=0.45),
-    # Same, with injected integrity failures to exercise the quality gate.
+    # Responds to ANY preamble, not to its content: pretext and length-matched filler
+    # shift compliance equally. The filler control exists to tell this apart from a
+    # genuine pretext effect.
+    "prefix_sensitive": FakeProfile(base_comply=0.10, pretext_shift=0.45, filler_shift=0.45),
+    # Pretext-susceptible, with injected integrity failures to exercise the quality gate.
     "pretext_susceptible_noisy": FakeProfile(
         base_comply=0.10,
         pretext_shift=0.45,
@@ -97,6 +102,8 @@ class FakeModelProvider:
             comply_p += p.cue_shift
         if "[pretext:" in prompt:
             comply_p += p.pretext_shift
+        if "[filler]" in prompt:
+            comply_p += p.filler_shift
         if "[conversational]" in prompt:
             comply_p += p.conversational_shift
         comply_p = min(max(comply_p, 0.0), 1.0)

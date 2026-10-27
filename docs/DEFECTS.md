@@ -1,8 +1,9 @@
 # Historical defects and methodological weaknesses
 
-This document covers the archived 2026 experiment in
-[`hydrangeas20/safetylens-research`](https://github.com/hydrangeas20/safetylens-research)
-at commit `b5d0dba906b2d6bbeb0bdfc0cbc958079e8ac3cc`. The archive has not been modified.
+This document covers the archived 2026 experiment in `hydrangeas20/safetylens-research` at
+commit `b5d0dba906b2d6bbeb0bdfc0cbc958079e8ac3cc`. That repository is **private** because it
+contains raw model outputs (W9), and it has not been modified. The evidence below cites its
+files; the redacted data and generated flags in this repository reproduce every count.
 
 - **Confirmed defects (D)** are shown directly by the archived code or data. Each one has an
   automated check in this repository.

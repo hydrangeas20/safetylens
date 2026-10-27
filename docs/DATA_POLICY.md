@@ -24,6 +24,18 @@
 
 These checks are a safety net. They can't recognise every harmful passage.
 
+## History is permanent (`safetylens release-audit`, run in CI)
+
+Once the repository is public, **every reachable object can be fetched**, including commits
+on unmerged branches and the `refs/pull/N/head` refs GitHub keeps for every pull request even
+after its branch is deleted. Deleting a file in a later commit does not unpublish it.
+
+`safetylens release-audit` therefore scans every blob and every commit message reachable from
+any ref. It adds email and local-path checks to the checks above. Given a local archive
+checkout (`--archive`), it also proves that no archive commit or blob exists here except the
+three aggregate tables that are copied on purpose. If it reports a blocking finding in
+history, the fix is a new repository with clean history, not a new commit.
+
 ## Manual review before anything becomes public
 
 - [ ] Every excerpt or example in the README, docs and reports has been read by a person and

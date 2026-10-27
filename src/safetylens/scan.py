@@ -13,6 +13,7 @@ review that is still required before anything is made public.
 from __future__ import annotations
 
 import csv
+import io
 import json
 import re
 import subprocess
@@ -44,7 +45,13 @@ HAZARD_TERMS: tuple[str, ...] = (
 RAW_TEXT_COLUMNS = frozenset({"prompt", "response", "raw_response", "text", "completion"})
 SKIP_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".lock")
 # Files that legitimately contain the patterns above (definitions and their tests).
-ALLOWLIST = frozenset({"src/safetylens/scan.py", "tests/unit/test_scan.py"})
+ALLOWLIST = frozenset(
+    {
+        "src/safetylens/scan.py",
+        "src/safetylens/release_audit.py",  # its regexes contain the path patterns it detects
+        "tests/unit/test_scan.py",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -76,16 +83,15 @@ def scan_text(rel: str, text: str) -> list[Finding]:
     return findings
 
 
-def scan_csv(rel: str, path: Path) -> list[Finding]:
-    with path.open(encoding="utf-8", newline="") as fh:
-        header = next(csv.reader(fh), [])
+def csv_findings(rel: str, text: str) -> list[Finding]:
+    header = next(csv.reader(io.StringIO(text)), [])
     bad = RAW_TEXT_COLUMNS.intersection(h.strip().lower() for h in header)
     return [Finding(rel, "raw_text_column", c) for c in sorted(bad)]
 
 
-def scan_jsonl(rel: str, path: Path) -> list[Finding]:
+def jsonl_findings(rel: str, text: str) -> list[Finding]:
     findings: list[Finding] = []
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for lineno, line in enumerate(text.splitlines(), 1):
         if not line.strip():
             continue
         try:
@@ -93,25 +99,41 @@ def scan_jsonl(rel: str, path: Path) -> list[Finding]:
         except json.JSONDecodeError:
             continue
         result = row.get("result") if isinstance(row, dict) else None
-        text = result.get("text") if isinstance(result, dict) else None
-        if isinstance(text, str) and "[SYNTHETIC" not in text and "[MODEL ERROR" not in text:
+        out = result.get("text") if isinstance(result, dict) else None
+        if isinstance(out, str) and "[SYNTHETIC" not in out and "[MODEL ERROR" not in out:
             findings.append(Finding(rel, "unredacted_response", f"line {lineno}"))
     return findings
+
+
+def scan_content(rel: str, text: str) -> list[Finding]:
+    """All content checks for one file, given its path and text."""
+    if rel in ALLOWLIST:
+        return []
+    findings = scan_text(rel, text)
+    if rel.endswith(".csv"):
+        findings.extend(csv_findings(rel, text))
+    elif rel.endswith(".jsonl"):
+        findings.extend(jsonl_findings(rel, text))
+    return findings
+
+
+def scan_csv(rel: str, path: Path) -> list[Finding]:
+    return csv_findings(rel, path.read_text(encoding="utf-8"))
+
+
+def scan_jsonl(rel: str, path: Path) -> list[Finding]:
+    return jsonl_findings(rel, path.read_text(encoding="utf-8"))
 
 
 def scan_repo(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     for path in tracked_files(root):
         rel = path.relative_to(root).as_posix()
-        if rel in ALLOWLIST or rel.endswith(SKIP_SUFFIXES) or not path.exists():
+        if rel.endswith(SKIP_SUFFIXES) or not path.exists():
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        findings.extend(scan_text(rel, text))
-        if rel.endswith(".csv"):
-            findings.extend(scan_csv(rel, path))
-        elif rel.endswith(".jsonl"):
-            findings.extend(scan_jsonl(rel, path))
+        findings.extend(scan_content(rel, text))
     return findings
